@@ -1,86 +1,196 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AI Page Summarizer</title>
-    <link rel="stylesheet" href="popup.css" />
-  </head>
-  <body>
-    <main class="app" aria-labelledby="app-title">
-      <header class="app__header">
-        <h1 id="app-title" class="app__brand">AI Page Summarizer</h1>
-        <label class="dev-toggle" title="Dev: force the next Summarize to fail">
-          <input id="errorToggle" type="checkbox" />
-          <span>Force error</span>
-        </label>
-      </header>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>AI Page Summarizer</title>
+        <link rel="stylesheet" href="popup.css" />
+    </head>
+    <body>
+        <main class="app" aria-labelledby="app-title">
+            <header class="app__header">
+                <h1 id="app-title" class="app__brand">AI Page Summarizer</h1>
+                <button
+                    id="themeToggle"
+                    class="theme-toggle"
+                    type="button"
+                    aria-label="Switch to dark mode"
+                    title="Toggle theme"
+                >
+                    <svg
+                        class="theme-icon theme-icon--moon"
+                        viewBox="0 0 24 24"
+                        width="18"
+                        height="18"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                    >
+                        <path
+                            d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"
+                        />
+                    </svg>
+                    <svg
+                        class="theme-icon theme-icon--sun"
+                        viewBox="0 0 24 24"
+                        width="18"
+                        height="18"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                    >
+                        <circle cx="12" cy="12" r="4" />
+                        <path
+                            d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"
+                        />
+                    </svg>
+                </button>
+            </header>
 
-      <section class="page-info" aria-label="Current page">
-        <span class="page-info__label">Page</span>
-        <p id="pageTitle" class="page-info__title">
-          Sample article: How modern browsers render the web
-        </p>
-      </section>
+            <section class="page-info" aria-label="Current page">
+                <span class="page-info__label">Page Title</span>
+                <p id="pageTitle" class="page-info__title">
+                    Sample article: How modern browsers render the web
+                </p>
+            </section>
 
-      <div class="actions">
-        <button id="summarizeBtn" class="btn btn--primary" type="button">
-          Summarize Page
-        </button>
-        <button id="resetBtn" class="btn btn--ghost" type="button" disabled>
-          Clear
-        </button>
-      </div>
+            <div class="actions">
+                <button
+                    id="summarizeBtn"
+                    class="btn btn--primary"
+                    type="button"
+                >
+                    Summarize Page
+                </button>
+                <button
+                    id="resetBtn"
+                    class="btn btn--ghost"
+                    type="button"
+                    disabled
+                >
+                    Clear
+                </button>
+            </div>
 
-      <section id="output" class="output" aria-live="polite" aria-busy="false">
-        <div id="state-idle" class="state state--idle" data-state>
-          <p class="muted">
-            Click <strong>Summarize Page</strong> to generate a structured
-            summary.
-          </p>
-        </div>
+            <label class="brevity-toggle">
+                <input id="briefMode" type="checkbox" />
+                <span>Brief summary (3 bullet points)</span>
+            </label>
 
-        <div id="state-loading" class="state state--loading" data-state hidden>
-          <div class="spinner" aria-hidden="true"></div>
-          <p class="muted">Summarizing&hellip;</p>
-        </div>
+            <section
+                id="output"
+                class="output"
+                aria-live="polite"
+                aria-busy="false"
+            >
+                <div id="state-idle" class="state state--idle">
+                    <p class="muted">
+                        Click <strong>Summarize Page</strong> to generate a
+                        structured summary.
+                    </p>
+                </div>
 
-        <div
-          id="state-error"
-          class="state state--error"
-          data-state
-          hidden
-          role="alert"
-        >
-          <p class="error-title">Something went wrong</p>
-          <p id="errorMsg" class="muted">
-            We couldn't generate a summary. Please try again.
-          </p>
-        </div>
+                <div
+                    id="state-loading"
+                    class="state state--loading"
+                    hidden
+                >
+                    <div class="spinner" aria-hidden="true"></div>
+                    <p class="muted">Summarizing&hellip;</p>
+                </div>
 
-        <article
-          id="state-success"
-          class="state state--success"
-          data-state
-          hidden
-        >
-          <div class="meta">
-            <span class="badge" id="readingTime">5 min read</span>
-          </div>
+                <div
+                    id="state-error"
+                    class="state state--error"
+                    hidden
+                    role="alert"
+                >
+                    <p class="error-title">Something went wrong</p>
+                    <p id="errorMsg" class="muted">
+                        We couldn't generate a summary. Please try again.
+                    </p>
+                </div>
 
-          <section class="block">
-            <h2 class="block__title">Summary</h2>
-            <ul id="bullets" class="bullets"></ul>
-          </section>
+                <article
+                    id="state-success"
+                    class="state state--success"
+                    hidden
+                >
+                    <div class="meta">
+                        <div class="meta__badges">
+                            <span class="badge" id="readingTime" hidden></span>
+                            <span class="badge" id="wordCount" hidden></span>
+                        </div>
+                        <button
+                            id="copyBtn"
+                            class="copy-btn"
+                            type="button"
+                            aria-label="Copy summary"
+                            title="Copy summary"
+                        >
+                            <svg
+                                class="copy-icon copy-icon--default"
+                                viewBox="0 0 24 24"
+                                width="16"
+                                height="16"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                aria-hidden="true"
+                            >
+                                <rect
+                                    x="9"
+                                    y="9"
+                                    width="13"
+                                    height="13"
+                                    rx="2"
+                                    ry="2"
+                                />
+                                <path
+                                    d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                                />
+                            </svg>
+                            <svg
+                                class="copy-icon copy-icon--check"
+                                viewBox="0 0 24 24"
+                                width="16"
+                                height="16"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                aria-hidden="true"
+                            >
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                        </button>
+                    </div>
 
-          <section class="block">
-            <h2 class="block__title">Key insights</h2>
-            <ul id="insights" class="bullets bullets--insights"></ul>
-          </section>
-        </article>
-      </section>
-    </main>
+                    <section class="block">
+                        <h2 class="block__title">Summary</h2>
+                        <ul id="bullets" class="bullets"></ul>
+                    </section>
 
-    <script src="popup.js"></script>
-  </body>
+                    <section class="block">
+                        <h2 class="block__title">Key insights</h2>
+                        <ul
+                            id="insights"
+                            class="bullets bullets--insights"
+                        ></ul>
+                    </section>
+                </article>
+            </section>
+        </main>
+
+        <script src="popup.js"></script>
+    </body>
 </html>
