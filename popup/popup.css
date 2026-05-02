@@ -77,21 +77,6 @@ body {
   letter-spacing: 0.01em;
 }
 
-.dev-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: var(--muted);
-  cursor: pointer;
-  user-select: none;
-}
-
-.dev-toggle input {
-  margin: 0;
-  accent-color: var(--primary);
-}
-
 .page-info {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -178,6 +163,10 @@ body {
 
 .state {
   padding: 14px;
+}
+
+.state[hidden] {
+  display: none !important;
 }
 
 .state--loading {

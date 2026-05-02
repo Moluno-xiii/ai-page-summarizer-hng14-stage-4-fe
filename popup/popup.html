@@ -1,86 +1,104 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AI Page Summarizer</title>
-    <link rel="stylesheet" href="popup.css" />
-  </head>
-  <body>
-    <main class="app" aria-labelledby="app-title">
-      <header class="app__header">
-        <h1 id="app-title" class="app__brand">AI Page Summarizer</h1>
-        <label class="dev-toggle" title="Dev: force the next Summarize to fail">
-          <input id="errorToggle" type="checkbox" />
-          <span>Force error</span>
-        </label>
-      </header>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>AI Page Summarizer</title>
+        <link rel="stylesheet" href="popup.css" />
+    </head>
+    <body>
+        <main class="app" aria-labelledby="app-title">
+            <header class="app__header">
+                <h1 id="app-title" class="app__brand">AI Page Summarizer</h1>
+            </header>
 
-      <section class="page-info" aria-label="Current page">
-        <span class="page-info__label">Page</span>
-        <p id="pageTitle" class="page-info__title">
-          Sample article: How modern browsers render the web
-        </p>
-      </section>
+            <section class="page-info" aria-label="Current page">
+                <span class="page-info__label">Page Title</span>
+                <p id="pageTitle" class="page-info__title">
+                    Sample article: How modern browsers render the web
+                </p>
+            </section>
 
-      <div class="actions">
-        <button id="summarizeBtn" class="btn btn--primary" type="button">
-          Summarize Page
-        </button>
-        <button id="resetBtn" class="btn btn--ghost" type="button" disabled>
-          Clear
-        </button>
-      </div>
+            <div class="actions">
+                <button
+                    id="summarizeBtn"
+                    class="btn btn--primary"
+                    type="button"
+                >
+                    Summarize Page
+                </button>
+                <button
+                    id="resetBtn"
+                    class="btn btn--ghost"
+                    type="button"
+                    disabled
+                >
+                    Clear
+                </button>
+            </div>
 
-      <section id="output" class="output" aria-live="polite" aria-busy="false">
-        <div id="state-idle" class="state state--idle" data-state>
-          <p class="muted">
-            Click <strong>Summarize Page</strong> to generate a structured
-            summary.
-          </p>
-        </div>
+            <section
+                id="output"
+                class="output"
+                aria-live="polite"
+                aria-busy="false"
+            >
+                <div id="state-idle" class="state state--idle" data-state>
+                    <p class="muted">
+                        Click <strong>Summarize Page</strong> to generate a
+                        structured summary.
+                    </p>
+                </div>
 
-        <div id="state-loading" class="state state--loading" data-state hidden>
-          <div class="spinner" aria-hidden="true"></div>
-          <p class="muted">Summarizing&hellip;</p>
-        </div>
+                <div
+                    id="state-loading"
+                    class="state state--loading"
+                    data-state
+                    hidden
+                >
+                    <div class="spinner" aria-hidden="true"></div>
+                    <p class="muted">Summarizing&hellip;</p>
+                </div>
 
-        <div
-          id="state-error"
-          class="state state--error"
-          data-state
-          hidden
-          role="alert"
-        >
-          <p class="error-title">Something went wrong</p>
-          <p id="errorMsg" class="muted">
-            We couldn't generate a summary. Please try again.
-          </p>
-        </div>
+                <div
+                    id="state-error"
+                    class="state state--error"
+                    data-state
+                    hidden
+                    role="alert"
+                >
+                    <p class="error-title">Something went wrong</p>
+                    <p id="errorMsg" class="muted">
+                        We couldn't generate a summary. Please try again.
+                    </p>
+                </div>
 
-        <article
-          id="state-success"
-          class="state state--success"
-          data-state
-          hidden
-        >
-          <div class="meta">
-            <span class="badge" id="readingTime">5 min read</span>
-          </div>
+                <article
+                    id="state-success"
+                    class="state state--success"
+                    data-state
+                    hidden
+                >
+                    <div class="meta">
+                        <span class="badge" id="readingTime">5 min read</span>
+                    </div>
 
-          <section class="block">
-            <h2 class="block__title">Summary</h2>
-            <ul id="bullets" class="bullets"></ul>
-          </section>
+                    <section class="block">
+                        <h2 class="block__title">Summary</h2>
+                        <ul id="bullets" class="bullets"></ul>
+                    </section>
 
-          <section class="block">
-            <h2 class="block__title">Key insights</h2>
-            <ul id="insights" class="bullets bullets--insights"></ul>
-          </section>
-        </article>
-      </section>
-    </main>
+                    <section class="block">
+                        <h2 class="block__title">Key insights</h2>
+                        <ul
+                            id="insights"
+                            class="bullets bullets--insights"
+                        ></ul>
+                    </section>
+                </article>
+            </section>
+        </main>
 
-    <script src="popup.js"></script>
-  </body>
+        <script src="popup.js"></script>
+    </body>
 </html>
