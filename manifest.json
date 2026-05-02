@@ -3,8 +3,11 @@
   "name": "AI Page Summarizer",
   "version": "0.1.0",
   "description": "Summarizes the current webpage with AI and then highlights the key points from the page.",
-  "permissions": ["storage", "activeTab"],
-  "host_permissions": ["https://generativelanguage.googleapis.com/*"],
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "http://localhost:8000/*",
+    "https://ai-page-summarizer-api-proxy-production.up.railway.app/*"
+  ],
   "action": {
     "default_title": "AI Page Summarizer",
     "default_popup": "popup/popup.html",

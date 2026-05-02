@@ -1,121 +1,155 @@
-const GEMINI_MODEL = "gemini-2.5-flash";
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const CACHE_PREFIX = "summary:";
 const MAX_CONTENT_LENGTH = 50_000;
+const MIN_CONTENT_LENGTH = 200;
+const API_URL =
+  "https://ai-page-summarizer-api-proxy-production.up.railway.app/summarize";
 
-const SUMMARY_SCHEMA = {
-  type: "object",
-  properties: {
-    bullets: { type: "array", items: { type: "string" } },
-    insights: { type: "array", items: { type: "string" } },
-    readingTimeMinutes: { type: "integer" },
-    keySentences: { type: "array", items: { type: "string" } },
-  },
-  required: ["bullets", "insights", "readingTimeMinutes", "keySentences"],
+const countWords = (text) => {
+  if (typeof text !== "string") return 0;
+  const trimmed = text.trim();
+  if (!trimmed) return 0;
+  return trimmed.split(/\s+/).length;
 };
 
-const PROMPT = `You are a concise article summarizer. Given the article below, produce:
-- bullets: 4-6 short bullet points capturing the key arguments
-- insights: 2-4 non-obvious takeaways or implications
-- readingTimeMinutes: estimated reading time at 150 words/minute, rounded to the nearest minute
-- keySentences: 4-6 verbatim sentences from the article that capture the most important points (copy exactly, these will be highlighted in-page)
+const normalizeBrevity = (value) => (value === "brief" ? "brief" : "standard");
 
-Respond as JSON only.
+const cacheKey = (url, brevity) => `${CACHE_PREFIX}${brevity}:${url}`;
 
-Article:
-`;
-
-const getApiKey = async () => {
-  const { geminiApiKey } = await chrome.storage.local.get("geminiApiKey");
-  return typeof geminiApiKey === "string" && geminiApiKey.trim()
-    ? geminiApiKey.trim()
-    : null;
-};
-
-const cacheKey = (url) => `${CACHE_PREFIX}${url}`;
-
-const getCachedSummary = async (url) => {
-  const key = cacheKey(url);
+const getCachedSummary = async (url, brevity) => {
+  const key = cacheKey(url, brevity);
   const data = await chrome.storage.local.get(key);
   return data[key] || null;
 };
 
-const setCachedSummary = async (url, summary) => {
-  await chrome.storage.local.set({ [cacheKey(url)]: summary });
+const setCachedSummary = async (url, brevity, summary) => {
+  await chrome.storage.local.set({ [cacheKey(url, brevity)]: summary });
 };
 
-const callGemini = async (apiKey, content) => {
-  const res = await fetch(
-    `${GEMINI_ENDPOINT}?key=${encodeURIComponent(apiKey)}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: PROMPT + content }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: SUMMARY_SCHEMA,
-          temperature: 0.4,
-        },
-      }),
+const isScriptableUrl = (url) => {
+  if (typeof url !== "string") return false;
+  if (!/^https?:\/\//.test(url)) return false;
+  if (url.startsWith("https://chrome.google.com/webstore")) return false;
+  if (url.startsWith("https://chromewebstore.google.com/")) return false;
+  return true;
+};
+
+const querySummarizer = async (content, brevity) => {
+  const res = await fetch(API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify({ content, brevity }),
+  });
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    const err = new Error(`Gemini API ${res.status}: ${body.slice(0, 200)}`);
-    err.code = res.status === 429 ? "RATE_LIMIT" : "API_ERROR";
+    const err = new Error(
+      `Failed to summarize ${res.status}: ${body.slice(0, 200)}`,
+    );
+    err.code = res.status;
     throw err;
   }
 
   const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) {
-    const err = new Error("Empty response from Gemini");
-    err.code = "PARSE_ERROR";
-    throw err;
-  }
+  if (!data.success) throw new Error(data.message);
+  return data.data;
+};
 
+const injectContentScript = async (tabId) => {
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    files: ["content/content.js"],
+  });
+};
+
+const sendToTab = (tabId, message) =>
+  new Promise((resolve, reject) => {
+    chrome.tabs.sendMessage(tabId, message, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve(response);
+    });
+  });
+
+const applyHighlights = async (tabId, sentences) => {
+  if (!Array.isArray(sentences) || sentences.length === 0) return;
   try {
-    return JSON.parse(text);
+    await sendToTab(tabId, { type: "HIGHLIGHT", sentences });
+  } catch {}
+};
+
+const summarizeTab = async (tabId, brevity) => {
+  let tab;
+  try {
+    tab = await chrome.tabs.get(tabId);
   } catch {
-    const err = new Error("Gemini returned invalid JSON");
-    err.code = "PARSE_ERROR";
-    throw err;
-  }
-};
-
-const validateMessage = (msg) => {
-  if (!msg || typeof msg !== "object") return "Invalid message";
-  if (msg.type !== "SUMMARIZE") return "Unknown message type";
-  if (typeof msg.url !== "string" || !msg.url) return "Missing url";
-  if (typeof msg.content !== "string" || !msg.content.trim())
-    return "Missing content";
-  if (msg.content.length > MAX_CONTENT_LENGTH)
-    return `Content too long (>${MAX_CONTENT_LENGTH} chars)`;
-  return null;
-};
-
-const handleSummarize = async ({ url, content }) => {
-  const cached = await getCachedSummary(url);
-  if (cached) {
-    return { ok: true, summary: cached, cached: true };
+    return { ok: false, code: "NO_TAB", error: "Tab not found." };
   }
 
-  const apiKey = await getApiKey();
-  if (!apiKey) {
+  if (!isScriptableUrl(tab.url)) {
     return {
       ok: false,
-      code: "NO_KEY",
+      code: "UNSUPPORTED_PAGE",
       error:
-        "Gemini API key not set. Open the service worker DevTools and run: chrome.storage.local.set({geminiApiKey: 'YOUR_KEY'})",
+        "This page can't be summarized. Browser internal pages and the Chrome Web Store aren't accessible to extensions.",
     };
   }
 
   try {
-    const summary = await callGemini(apiKey, content);
-    await setCachedSummary(url, summary);
-    return { ok: true, summary, cached: false };
+    await injectContentScript(tabId);
+  } catch (e) {
+    return {
+      ok: false,
+      code: "INJECT_FAILED",
+      error: `Couldn't inject extractor: ${e.message}`,
+    };
+  }
+
+  const cached = await getCachedSummary(tab.url, brevity);
+  if (cached) {
+    await applyHighlights(tabId, cached.keySentences);
+    return { ok: true, summary: cached, cached: true };
+  }
+
+  let extracted;
+  try {
+    extracted = await sendToTab(tabId, { type: "EXTRACT" });
+  } catch (e) {
+    return {
+      ok: false,
+      code: "EXTRACT_FAILED",
+      error: `Couldn't reach the page extractor: ${e.message}`,
+    };
+  }
+
+  if (!extracted?.ok) {
+    return {
+      ok: false,
+      code: "EXTRACT_FAILED",
+      error: extracted?.error || "Page extraction failed.",
+    };
+  }
+
+  const content = (extracted.content || "").trim();
+  if (content.length < MIN_CONTENT_LENGTH) {
+    return {
+      ok: false,
+      code: "NO_CONTENT",
+      error: "Couldn't find enough readable article text on this page.",
+    };
+  }
+
+  const trimmed =
+    content.length > MAX_CONTENT_LENGTH
+      ? content.slice(0, MAX_CONTENT_LENGTH)
+      : content;
+
+  let summary;
+  try {
+    summary = await querySummarizer(trimmed, brevity);
   } catch (e) {
     return {
       ok: false,
@@ -123,15 +157,31 @@ const handleSummarize = async ({ url, content }) => {
       error: e.message || "Unknown error",
     };
   }
+
+  const summaryText = [...summary.bullets, ...summary.insights].join(" ");
+  summary.wordCount = countWords(summaryText);
+  summary.readingTimeMinutes = Math.max(1, Math.round(summary.wordCount / 180));
+
+  await setCachedSummary(tab.url, brevity, summary);
+  await applyHighlights(tabId, summary.keySentences);
+
+  return { ok: true, summary, cached: false };
 };
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  const validationError = validateMessage(msg);
-  if (validationError) {
-    sendResponse({ ok: false, code: "BAD_REQUEST", error: validationError });
-    return false;
+  if (
+    msg?.type === "SUMMARIZE_TAB" &&
+    Number.isInteger(msg.tabId) &&
+    msg.tabId >= 0
+  ) {
+    summarizeTab(msg.tabId, normalizeBrevity(msg.brevity)).then(sendResponse);
+    return true;
   }
 
-  handleSummarize(msg).then(sendResponse);
-  return true;
+  sendResponse({
+    ok: false,
+    code: "BAD_REQUEST",
+    error: "Unknown or invalid message.",
+  });
+  return false;
 });

@@ -1,28 +1,11 @@
-"use strict";
-
 const THEME_KEY = "theme";
+const BREVITY_KEY = "brevity";
+const COPY_FEEDBACK_MS = 1500;
+
 const storedTheme = localStorage.getItem(THEME_KEY);
 if (storedTheme === "light" || storedTheme === "dark") {
   document.documentElement.setAttribute("data-theme", storedTheme);
 }
-
-const SAMPLE_ARTICLE = `How modern browsers render the web
-
-When you open a web page, the browser performs a remarkable sequence of steps to turn raw bytes into the interface you see and interact with. Understanding this pipeline helps explain why some pages feel snappy while others stutter, and gives developers leverage for performance optimization.
-
-The first step is parsing. As HTML bytes arrive over the network, the browser tokenizes them and assembles a Document Object Model — a tree of nodes representing every element on the page. The parser is greedy: it builds the DOM incrementally, even before the entire document has finished downloading. This is why content can appear progressively rather than all at once.
-
-In parallel, the browser fetches and parses CSS files referenced from the HTML. Each stylesheet is converted into the CSS Object Model, or CSSOM. Unlike the DOM, the CSSOM blocks rendering by default — the browser cannot draw a single pixel until it knows what styles to apply. This is the reason CSS is called "render-blocking" and why minimizing critical CSS is such a common optimization.
-
-JavaScript adds another wrinkle. When the parser encounters a synchronous <script> tag, it pauses HTML parsing entirely until the script downloads and executes. This is why placing scripts in the document head without async or defer can devastate page load times. The async attribute lets a script execute as soon as it arrives; defer waits until after parsing completes. Both attributes preserve interactivity but suit different use cases.
-
-Once the DOM and CSSOM are ready, the browser combines them into a render tree, which represents only the visible elements with their computed styles. Display: none nodes are excluded, while pseudo-elements are inserted. The browser then performs layout, calculating the precise position and size of every box. Layout is expensive — touching certain CSS properties triggers a reflow that cascades through the entire tree.
-
-Painting comes next. The browser walks the render tree and produces a series of draw calls, organized into layers. Layers are independent surfaces that can be moved, scaled, or composited without retouching their contents. Properties like transform and opacity are cheap precisely because they only affect compositing, not layout or paint.
-
-Finally, the compositor thread reassembles the layers on the GPU. This thread runs independently of the main thread, which is why scrolling and CSS animations can remain smooth even when JavaScript is busy. Skilled developers exploit this by promoting frequently-animated elements to their own layer with will-change, though over-using this hint can balloon GPU memory consumption.
-
-Performance, then, is largely a story of avoiding work in the wrong place at the wrong time. Reduce render-blocking resources, batch DOM reads and writes to avoid layout thrashing, and lean on the compositor where you can. The pipeline rewards developers who understand it.`;
 
 const STATES = ["idle", "loading", "success", "error"];
 
@@ -35,8 +18,14 @@ const elements = {
   bullets: document.getElementById("bullets"),
   insights: document.getElementById("insights"),
   readingTime: document.getElementById("readingTime"),
+  wordCount: document.getElementById("wordCount"),
   themeToggle: document.getElementById("themeToggle"),
+  briefMode: document.getElementById("briefMode"),
+  copyBtn: document.getElementById("copyBtn"),
 };
+
+let lastSummary = null;
+let copyResetTimer = null;
 
 const getCurrentTheme = () => {
   const explicit = document.documentElement.getAttribute("data-theme");
@@ -75,7 +64,17 @@ const setState = (name) => {
 };
 
 const renderSummary = (summary) => {
+  lastSummary = summary;
+
   elements.readingTime.textContent = `${summary.readingTimeMinutes} min read`;
+  elements.readingTime.hidden = false;
+
+  if (Number.isFinite(summary.wordCount) && summary.wordCount > 0) {
+    elements.wordCount.textContent = `${summary.wordCount.toLocaleString()} words`;
+    elements.wordCount.hidden = false;
+  } else {
+    elements.wordCount.hidden = true;
+  }
 
   elements.bullets.replaceChildren(
     ...summary.bullets.map((text) => {
@@ -94,6 +93,32 @@ const renderSummary = (summary) => {
   );
 };
 
+const formatSummaryForCopy = (summary) => {
+  const lines = ["Summary:"];
+  for (const b of summary.bullets) lines.push(`• ${b}`);
+  if (Array.isArray(summary.insights) && summary.insights.length > 0) {
+    lines.push("", "Key insights:");
+    for (const i of summary.insights) lines.push(`• ${i}`);
+  }
+  return lines.join("\n");
+};
+
+const handleCopy = async () => {
+  if (!lastSummary) return;
+  try {
+    await navigator.clipboard.writeText(formatSummaryForCopy(lastSummary));
+    elements.copyBtn.classList.add("copy-btn--copied");
+    elements.copyBtn.setAttribute("aria-label", "Copied");
+    if (copyResetTimer) clearTimeout(copyResetTimer);
+    copyResetTimer = setTimeout(() => {
+      elements.copyBtn.classList.remove("copy-btn--copied");
+      elements.copyBtn.setAttribute("aria-label", "Copy summary");
+    }, COPY_FEEDBACK_MS);
+  } catch {
+    console.error("clipboard copy failed");
+  }
+};
+
 const renderError = (message) => {
   elements.errorMsg.textContent = message;
 };
@@ -103,38 +128,44 @@ const getActiveTab = async () => {
     active: true,
     currentWindow: true,
   });
-  return tab || null;
+  return tab;
 };
 
-const requestSummary = ({ url, content }) =>
+const requestSummary = (tabId, brevity) =>
   new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ type: "SUMMARIZE", url, content }, (res) => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-        return;
-      }
-      if (!res) {
-        reject(new Error("No response from background worker"));
-        return;
-      }
-      resolve(res);
-    });
+    chrome.runtime.sendMessage(
+      { type: "SUMMARIZE_TAB", tabId, brevity },
+      (res) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        if (!res) {
+          reject(new Error("No response from background worker"));
+          return;
+        }
+        resolve(res);
+      },
+    );
   });
+
+const getBrevity = () => (elements.briefMode.checked ? "brief" : "standard");
+
+const handleBrevityChange = () => {
+  localStorage.setItem(BREVITY_KEY, getBrevity());
+};
 
 const handleSummarize = async () => {
   setState("loading");
 
-  if (!activeTab || !activeTab.url) {
+  if (!activeTab || !Number.isInteger(activeTab.id)) {
     renderError("Could not read the active tab.");
     setState("error");
     return;
   }
 
   try {
-    const res = await requestSummary({
-      url: activeTab.url,
-      content: SAMPLE_ARTICLE,
-    });
+    const res = await requestSummary(activeTab.id, getBrevity());
 
     if (!res.ok) {
       renderError(res.error || "Request failed.");
@@ -151,19 +182,30 @@ const handleSummarize = async () => {
 };
 
 const handleReset = () => {
+  lastSummary = null;
   elements.bullets.replaceChildren();
   elements.insights.replaceChildren();
+  elements.readingTime.hidden = true;
+  elements.wordCount.hidden = true;
   renderError("We couldn't generate a summary. Please try again.");
   setState("idle");
   elements.summarizeBtn.focus();
 };
 
+const restoreBrevity = () => {
+  const stored = localStorage.getItem(BREVITY_KEY);
+  if (stored === "brief") elements.briefMode.checked = true;
+};
+
 const init = async () => {
   setState("idle");
+  restoreBrevity();
   updateThemeToggleAria(getCurrentTheme());
   elements.themeToggle.addEventListener("click", handleThemeToggle);
   elements.summarizeBtn.addEventListener("click", handleSummarize);
   elements.resetBtn.addEventListener("click", handleReset);
+  elements.briefMode.addEventListener("change", handleBrevityChange);
+  elements.copyBtn.addEventListener("click", handleCopy);
 
   activeTab = await getActiveTab();
   elements.pageTitle.textContent =

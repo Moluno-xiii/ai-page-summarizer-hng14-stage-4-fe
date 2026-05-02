@@ -78,13 +78,18 @@
                 </button>
             </div>
 
+            <label class="brevity-toggle">
+                <input id="briefMode" type="checkbox" />
+                <span>Brief summary (3 bullet points)</span>
+            </label>
+
             <section
                 id="output"
                 class="output"
                 aria-live="polite"
                 aria-busy="false"
             >
-                <div id="state-idle" class="state state--idle" data-state>
+                <div id="state-idle" class="state state--idle">
                     <p class="muted">
                         Click <strong>Summarize Page</strong> to generate a
                         structured summary.
@@ -94,7 +99,6 @@
                 <div
                     id="state-loading"
                     class="state state--loading"
-                    data-state
                     hidden
                 >
                     <div class="spinner" aria-hidden="true"></div>
@@ -104,7 +108,6 @@
                 <div
                     id="state-error"
                     class="state state--error"
-                    data-state
                     hidden
                     role="alert"
                 >
@@ -117,11 +120,59 @@
                 <article
                     id="state-success"
                     class="state state--success"
-                    data-state
                     hidden
                 >
                     <div class="meta">
-                        <span class="badge" id="readingTime">5 min read</span>
+                        <div class="meta__badges">
+                            <span class="badge" id="readingTime" hidden></span>
+                            <span class="badge" id="wordCount" hidden></span>
+                        </div>
+                        <button
+                            id="copyBtn"
+                            class="copy-btn"
+                            type="button"
+                            aria-label="Copy summary"
+                            title="Copy summary"
+                        >
+                            <svg
+                                class="copy-icon copy-icon--default"
+                                viewBox="0 0 24 24"
+                                width="16"
+                                height="16"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                aria-hidden="true"
+                            >
+                                <rect
+                                    x="9"
+                                    y="9"
+                                    width="13"
+                                    height="13"
+                                    rx="2"
+                                    ry="2"
+                                />
+                                <path
+                                    d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                                />
+                            </svg>
+                            <svg
+                                class="copy-icon copy-icon--check"
+                                viewBox="0 0 24 24"
+                                width="16"
+                                height="16"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                aria-hidden="true"
+                            >
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                        </button>
                     </div>
 
                     <section class="block">
