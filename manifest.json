@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "AI Page Summarizer",
+  "version": "0.1.0",
+  "description": "Summarizes the current webpage with AI and then highlights the key points from the page.",
+  "action": {
+    "default_title": "AI Page Summarizer",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
+}
