@@ -17,7 +17,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0f1117;
     --surface: #161922;
     --surface-2: #1f2330;
@@ -30,6 +30,20 @@
     --danger: #f97066;
     --danger-bg: #2a1818;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f1117;
+  --surface: #161922;
+  --surface-2: #1f2330;
+  --text: #ecedf2;
+  --muted: #9aa0b3;
+  --border: #2a2f3d;
+  --primary: #818cf8;
+  --primary-hover: #6f7af0;
+  --primary-contrast: #0f1117;
+  --danger: #f97066;
+  --danger-bg: #2a1818;
 }
 
 * {
@@ -75,6 +89,56 @@ body {
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.01em;
+}
+
+.theme-toggle {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.theme-toggle:hover {
+  background: var(--surface-2);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.theme-icon--sun {
+  display: none;
+}
+.theme-icon--moon {
+  display: inline-block;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .theme-icon--sun {
+    display: inline-block;
+  }
+  :root:not([data-theme="light"]) .theme-icon--moon {
+    display: none;
+  }
+}
+
+:root[data-theme="dark"] .theme-icon--sun {
+  display: inline-block;
+}
+:root[data-theme="dark"] .theme-icon--moon {
+  display: none;
 }
 
 .page-info {

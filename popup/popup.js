@@ -1,5 +1,11 @@
 "use strict";
 
+const THEME_KEY = "theme";
+const storedTheme = localStorage.getItem(THEME_KEY);
+if (storedTheme === "light" || storedTheme === "dark") {
+  document.documentElement.setAttribute("data-theme", storedTheme);
+}
+
 const SAMPLE_ARTICLE = `How modern browsers render the web
 
 When you open a web page, the browser performs a remarkable sequence of steps to turn raw bytes into the interface you see and interact with. Understanding this pipeline helps explain why some pages feel snappy while others stutter, and gives developers leverage for performance optimization.
@@ -29,6 +35,31 @@ const elements = {
   bullets: document.getElementById("bullets"),
   insights: document.getElementById("insights"),
   readingTime: document.getElementById("readingTime"),
+  themeToggle: document.getElementById("themeToggle"),
+};
+
+const getCurrentTheme = () => {
+  const explicit = document.documentElement.getAttribute("data-theme");
+  if (explicit === "light" || explicit === "dark") return explicit;
+  return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+};
+
+const updateThemeToggleAria = (theme) => {
+  elements.themeToggle.setAttribute(
+    "aria-label",
+    theme === "dark" ? "Switch to light mode" : "Switch to dark mode",
+  );
+};
+
+const applyTheme = (theme) => {
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem(THEME_KEY, theme);
+  updateThemeToggleAria(theme);
+};
+
+const handleThemeToggle = () => {
+  const next = getCurrentTheme() === "dark" ? "light" : "dark";
+  applyTheme(next);
 };
 
 let activeTab = null;
@@ -129,6 +160,8 @@ const handleReset = () => {
 
 const init = async () => {
   setState("idle");
+  updateThemeToggleAria(getCurrentTheme());
+  elements.themeToggle.addEventListener("click", handleThemeToggle);
   elements.summarizeBtn.addEventListener("click", handleSummarize);
   elements.resetBtn.addEventListener("click", handleReset);
 
